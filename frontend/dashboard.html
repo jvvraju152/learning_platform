@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My Progress - Personalized Learning</title><link rel="stylesheet" href="style.css"></head>
+<body>
+<div id="top"></div>
+<div id="page">
+  <h1>My Progress</h1>
+  <div id="content">Loading...</div>
+</div>
+<script src="app.js"></script>
+<script>
+(async function () {
+  var user = await requireLogin(); if (!user) return;
+  var c = document.getElementById("content");
+  var a, rec;
+  try { a = await api("/me/analysis"); rec = await api("/me/recommendations"); }
+  catch (err) { showError(c, err); return; }
+
+  var h = '';
+  if (!a.topics.length) {
+    c.innerHTML = '<p>You have not answered any questions yet. <a href="subjects.html">Choose a subject and take a quiz</a> and your progress will appear here.</p>';
+    return;
+  }
+  h += '<p>Questions answered: <b>' + a.data_quality.rows_used + '</b>. Overall mastery: <b>' + pct(a.overall_mastery) + '</b>.</p>';
+  h += '<p class="small muted">Mastery is an estimate from your answers. Recent answers count more, and with very few answers it stays near 50%.</p>';
+
+  var subs = Object.keys(a.subject_mastery);
+  if (subs.length) {
+    h += '<h2>By subject</h2><table><tr><th>Subject</th><th>Mastery</th></tr>';
+    subs.forEach(function (s) { h += '<tr><td>' + esc(s) + '</td><td>' + pct(a.subject_mastery[s]) + '</td></tr>'; });
+    h += '</table>';
+  }
+
+  h += '<h2>Topics</h2><table><tr><th>Topic</th><th>Subject</th><th>Answered</th><th>Accuracy</th><th>Mastery</th><th>Status</th><th>Trend</th><th></th></tr>';
+  a.topics.forEach(function (t) {
+    var enough = t.status !== "insufficient_data";
+    h += '<tr><td><a href="module.html?topic=' + encodeURIComponent(t.topic_id) + '">' + esc(t.name) + '</a></td><td>' + esc(t.subject) + '</td><td>' + t.attempts +
+      '</td><td>' + pct(t.accuracy) + '</td><td>' + (enough ? pct(t.mastery) : '-') + '</td><td class="' + (t.status === "weak" ? "bad" : t.status === "strong" ? "ok" : "") + '">' +
+      esc(STATUS_TEXT[t.status] || t.status) + '</td><td>' + (enough ? esc(TREND_TEXT[t.trend] || "") : '') + '</td>' +
+      '<td><a class="btn" href="quiz.html?topic=' + encodeURIComponent(t.topic_id) + '&level=practice">Practice</a></td></tr>';
+  });
+  h += '</table>';
+  if (a.untested_topics.length) {
+    h += '<p class="small muted">Not attempted yet: ' + a.untested_topics.map(function (id) { return esc(a.topic_names[id] || id); }).join(", ") + '.</p>';
+  }
+
+  h += '<h2>What to work on</h2>';
+  if (rec.recommendations.length) {
+    rec.recommendations.forEach(function (r) {
+      h += '<div class="box"><b>' + esc(r.name) + '</b> (mastery ' + pct(r.mastery) + ', start with ' + esc(r.level) + ' material)';
+      var wt = a.weak_topics.concat(a.developing_topics).filter(function (t) { return t.topic_id === r.topic_id; })[0];
+      if (wt && wt.root_cause_for && wt.root_cause_for.length)
+        h += '<br><span class="small">This topic is a prerequisite for other weak topics, so fix it first.</span>';
+      h += '<ul>';
+      r.resources.forEach(function (x) {
+        h += '<li><a href="' + esc(x.url) + '" target="_blank" rel="noopener">' + esc(x.title) + '</a> <span class="small muted">' + esc(x.type) + ', ' + esc(x.minutes) + ' min, ' + esc(x.provider) + '</span></li>';
+      });
+      h += '</ul><a class="btn" href="quiz.html?topic=' + encodeURIComponent(r.topic_id) + '&level=practice">Practice this topic</a></div>';
+    });
+  } else {
+    h += '<p>No weak or developing topics found yet. Answer more questions so there is enough data (at least 3 answers per topic).</p>';
+  }
+
+  h += '<h2>Study plan</h2><form id="pf">Days: <input type="number" id="days" min="2" max="30" value="7"> ' +
+    'Minutes per day: <input type="number" id="mins" min="20" max="480" value="60"> <button type="submit">Make plan</button></form><div id="plan"></div>';
+  c.innerHTML = h;
+
+  document.getElementById("pf").onsubmit = async function (e) {
+    e.preventDefault();
+    var box = document.getElementById("plan");
+    try {
+      var p = await api("/me/plan?days=" + encodeURIComponent(document.getElementById("days").value) + "&minutes=" + encodeURIComponent(document.getElementById("mins").value));
+      if (!p.days.length) { box.innerHTML = '<p>' + esc(p.message) + '</p>'; return; }
+      var t = '<table><tr><th>Day</th><th>Topic</th><th>What to do</th></tr>';
+      p.days.forEach(function (d) {
+        t += '<tr><td>' + d.day + '</td><td>' + esc(d.topic_name) + '</td><td>';
+        d.tasks.forEach(function (k) {
+          if (k.type === "learn") t += 'Learn (' + k.minutes + ' min): ' + (k.resource ? '<a href="' + esc(k.resource.url) + '" target="_blank" rel="noopener">' + esc(k.resource.title) + '</a>' : 'read your notes') + '<br>';
+          else if (k.type === "practice") t += 'Practice (' + k.minutes + ' min): about ' + k.questions + ' questions<br>';
+          else if (k.type === "review") t += 'Review (' + k.minutes + ' min): ' + esc(k.note) + '<br>';
+          else t += 'Checkpoint (' + k.minutes + ' min): ' + esc(k.note) + '<br>';
+        });
+        t += '</td></tr>';
+      });
+      box.innerHTML = t + '</table><p class="small muted">Total: ' + p.total_minutes + ' minutes.</p>';
+    } catch (err) { showError(box, err); }
+  };
+})();
+</script>
+</body></html>

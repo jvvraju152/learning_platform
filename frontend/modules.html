@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Modules - Personalized Learning</title><link rel="stylesheet" href="style.css"></head>
+<body>
+<div id="top"></div>
+<div id="page">
+  <p class="crumbs"><a href="subjects.html">Subjects</a> &gt; <span id="crumb"></span></p>
+  <h1 id="title">Modules</h1>
+  <p>Each module has three quiz levels. Pass a level (60% or more) to unlock the next one.
+     Click a module name for study material.</p>
+  <div id="list">Loading...</div>
+  <p><a href="dashboard.html">See my progress and weak topics</a></p>
+</div>
+<script src="app.js"></script>
+<script>
+(async function () {
+  var user = await requireLogin(); if (!user) return;
+  var subject = param("subject");
+  var list = document.getElementById("list");
+  if (!subject) { location.replace("subjects.html"); return; }
+  document.getElementById("title").textContent = subject;
+  document.getElementById("crumb").textContent = subject;
+  try {
+    var r = await api("/modules?subject=" + encodeURIComponent(subject));
+    var h = '<table><tr><th>#</th><th>Module</th><th>Needs first</th><th>Easy</th><th>Medium</th><th>Hard</th><th>Mastery</th></tr>';
+    r.modules.forEach(function (m, i) {
+      var by = {}; m.levels.forEach(function (l) { by[l.difficulty] = l; });
+      h += '<tr><td>' + (i + 1) + '</td><td><a href="module.html?topic=' + encodeURIComponent(m.topic_id) + '">' + esc(m.name) + '</a>' +
+        (m.completed ? '<br><span class="ok small">Completed</span>' : '') + '</td><td class="small">' +
+        (m.prerequisites.length ? m.prerequisites.map(function (p) { return esc(p.name); }).join(", ") : "-") + '</td>';
+      ["easy", "medium", "hard"].forEach(function (d) {
+        h += '<td>' + (by[d] ? levelCell(m.topic_id, by[d]) : '-') + '</td>';
+      });
+      h += '<td>' + (m.mastery != null && m.status !== "insufficient_data" ? pct(m.mastery) + '<br><span class="small">' + esc(STATUS_TEXT[m.status] || "") + '</span>'
+            : '<span class="small muted">' + esc(STATUS_TEXT[m.status] || "-") + '</span>') + '</td></tr>';
+    });
+    list.innerHTML = h + '</table>';
+  } catch (err) { showError(list, err); }
+})();
+</script>
+</body></html>

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Log in - Personalized Learning</title><link rel="stylesheet" href="style.css"></head>
+<body>
+<div id="top"></div>
+<div id="page">
+  <h1>Log in</h1>
+  <form id="f">
+    <label for="email">Email</label>
+    <input type="email" id="email" required autofocus>
+    <label for="pw">Password</label>
+    <input type="password" id="pw" required>
+    <p><button type="submit" id="go">Log in</button></p>
+  </form>
+  <div id="msg"></div>
+  <p class="muted">New here? <a href="index.html">Create an account</a></p>
+</div>
+<script src="app.js"></script>
+<script>
+(function () {
+  drawTop(null);
+  document.getElementById("f").onsubmit = async function (e) {
+    e.preventDefault();
+    var btn = document.getElementById("go"); btn.disabled = true;
+    try {
+      await api("/login", {email: document.getElementById("email").value, password: document.getElementById("pw").value});
+      location.href = "subjects.html";
+    } catch (err) { showError(document.getElementById("msg"), err); btn.disabled = false; }
+  };
+})();
+</script>
+</body></html>

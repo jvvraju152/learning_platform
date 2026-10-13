@@ -1,0 +1,95 @@
+{
+ "arrays": {
+  "name": "Arrays",
+  "subject": "Data Structures",
+  "prerequisites": []
+ },
+ "linked_lists": {
+  "name": "Linked Lists",
+  "subject": "Data Structures",
+  "prerequisites": [
+   "arrays"
+  ]
+ },
+ "stacks_queues": {
+  "name": "Stacks & Queues",
+  "subject": "Data Structures",
+  "prerequisites": [
+   "arrays",
+   "linked_lists"
+  ]
+ },
+ "recursion": {
+  "name": "Recursion",
+  "subject": "Data Structures",
+  "prerequisites": []
+ },
+ "trees": {
+  "name": "Trees",
+  "subject": "Data Structures",
+  "prerequisites": [
+   "linked_lists",
+   "recursion"
+  ]
+ },
+ "sorting": {
+  "name": "Sorting & Searching",
+  "subject": "Data Structures",
+  "prerequisites": [
+   "arrays",
+   "recursion"
+  ]
+ },
+ "sql": {
+  "name": "SQL Queries",
+  "subject": "DBMS",
+  "prerequisites": []
+ },
+ "normalization": {
+  "name": "Normalization",
+  "subject": "DBMS",
+  "prerequisites": [
+   "sql"
+  ]
+ },
+ "transactions": {
+  "name": "Transactions & Concurrency",
+  "subject": "DBMS",
+  "prerequisites": [
+   "sql"
+  ]
+ },
+ "indexing": {
+  "name": "Indexing",
+  "subject": "DBMS",
+  "prerequisites": [
+   "sql"
+  ]
+ },
+ "processes": {
+  "name": "Processes & Threads",
+  "subject": "Operating Systems",
+  "prerequisites": []
+ },
+ "scheduling": {
+  "name": "CPU Scheduling",
+  "subject": "Operating Systems",
+  "prerequisites": [
+   "processes"
+  ]
+ },
+ "deadlocks": {
+  "name": "Deadlocks",
+  "subject": "Operating Systems",
+  "prerequisites": [
+   "processes"
+  ]
+ },
+ "memory": {
+  "name": "Memory Management",
+  "subject": "Operating Systems",
+  "prerequisites": [
+   "processes"
+  ]
+ }
+}

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Choose a subject - Personalized Learning</title><link rel="stylesheet" href="style.css"></head>
+<body>
+<div id="top"></div>
+<div id="page">
+  <h1 id="title">Choose a subject</h1>
+  <p>Pick the subject you want to study. You can come back and pick another one any time.</p>
+  <div id="list">Loading...</div>
+</div>
+<script src="app.js"></script>
+<script>
+(async function () {
+  var user = await requireLogin(); if (!user) return;
+  document.getElementById("title").textContent = "Hello, " + user.name + ". What do you want to learn?";
+  var list = document.getElementById("list");
+  try {
+    var r = await api("/subjects");
+    var h = '<table><tr><th>Subject</th><th>Modules</th><th>Levels passed</th><th></th></tr>';
+    r.subjects.forEach(function (s) {
+      var started = s.selected || s.levels_passed > 0;
+      h += '<tr><td>' + esc(s.subject) + '</td><td>' + s.modules + '</td><td>' + s.levels_passed + ' of ' + s.levels_total +
+        '</td><td><button data-s="' + esc(s.subject) + '">' + (started ? "Continue" : "Start") + '</button></td></tr>';
+    });
+    list.innerHTML = h + '</table>';
+    list.onclick = async function (e) {
+      var s = e.target.getAttribute && e.target.getAttribute("data-s");
+      if (!s) return;
+      e.target.disabled = true;
+      try { await api("/me/subjects", {subject: s}); location.href = "modules.html?subject=" + encodeURIComponent(s); }
+      catch (err) { showError(list, err); }
+    };
+  } catch (err) { showError(list, err); }
+})();
+</script>
+</body></html>

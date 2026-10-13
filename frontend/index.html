@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Personalized Learning</title><link rel="stylesheet" href="style.css"></head>
+<body>
+<div id="top"></div>
+<div id="page">
+  <h1>Welcome to Personalized Learning</h1>
+  <p>Take short quizzes by subject, module and level. The site finds the topics you are weak in and tells you what to study next.</p>
+  <div id="content"></div>
+</div>
+<script src="app.js"></script>
+<script>
+(async function () {
+  var c = document.getElementById("content");
+  drawTop(null);
+  var r;
+  try { r = await api("/me"); } catch (e) { r = {user: null}; }
+  if (r.user) {
+    drawTop(r.user);
+    c.innerHTML = '<p>Welcome back, <b>' + esc(r.user.name) + '</b>.</p>' +
+      '<p><a class="btn" href="subjects.html">Continue</a></p>';
+    return;
+  }
+  c.innerHTML =
+    '<form id="f"><label for="name">Please enter your name:</label>' +
+    '<input type="text" id="name" maxlength="60" autofocus required> ' +
+    '<button type="submit">Continue</button></form>' +
+    '<p class="muted">Already have an account? <a href="login.html">Log in</a></p>';
+  document.getElementById("f").onsubmit = function (e) {
+    e.preventDefault();
+    var n = document.getElementById("name").value.replace(/\s+/g, " ").trim();
+    if (!n) return;
+    try { sessionStorage.setItem("name", n); } catch (x) {}
+    location.href = "signup.html";
+  };
+})();
+</script>
+</body></html>

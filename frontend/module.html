@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Module - Personalized Learning</title><link rel="stylesheet" href="style.css"></head>
+<body>
+<div id="top"></div>
+<div id="page">
+  <div id="content">Loading...</div>
+</div>
+<script src="app.js"></script>
+<script>
+(async function () {
+  var user = await requireLogin(); if (!user) return;
+  var topic = param("topic"), c = document.getElementById("content");
+  if (!topic) { location.replace("subjects.html"); return; }
+  try {
+    var m = await api("/modules/" + encodeURIComponent(topic));
+    document.title = m.name + " - Personalized Learning";
+    var h = '<p class="crumbs"><a href="subjects.html">Subjects</a> &gt; <a href="modules.html?subject=' + encodeURIComponent(m.subject) + '">' +
+      esc(m.subject) + '</a> &gt; ' + esc(m.name) + '</p><h1>' + esc(m.name) + '</h1>';
+    if (m.prerequisites.length) {
+      h += '<p>Good to know first: ' + m.prerequisites.map(function (p) {
+        return '<a href="module.html?topic=' + encodeURIComponent(p.topic_id) + '">' + esc(p.name) + '</a>'; }).join(", ") + '.</p>';
+    }
+    if (m.mastery != null && m.status !== "insufficient_data") {
+      h += '<p>Your mastery of this module: <b>' + pct(m.mastery) + '</b> (' + esc(STATUS_TEXT[m.status] || "") +
+        (m.trend && TREND_TEXT[m.trend] ? ", " + esc(TREND_TEXT[m.trend]).toLowerCase() : "") + ').</p>';
+    }
+    h += '<h2>Study material</h2>';
+    if (m.resources.length) {
+      h += '<table><tr><th>Title</th><th>Type</th><th>Level</th><th>Minutes</th><th>From</th></tr>';
+      m.resources.forEach(function (r) {
+        h += '<tr><td><a href="' + esc(r.url) + '" target="_blank" rel="noopener">' + esc(r.title) + '</a>' +
+          (r.link_type === "search" ? ' <span class="small muted">(search results)</span>' : '') + '</td><td>' + esc(r.type) +
+          '</td><td>' + esc(r.level) + '</td><td>' + esc(r.minutes) + '</td><td>' + esc(r.provider) + '</td></tr>';
+      });
+      h += '</table>';
+    } else h += '<p class="muted">No study material for this module yet.</p>';
+    h += '<h2>Quizzes</h2><table><tr><th>Level</th><th>Questions</th><th>To pass</th><th>Your result</th></tr>';
+    m.levels.forEach(function (l) {
+      h += '<tr><td>' + LEVEL_NAME[l.difficulty] + '</td><td>' + l.questions + '</td><td>' + l.pass_mark + ' correct</td><td>' + levelCell(m.topic_id, l) + '</td></tr>';
+    });
+    h += '</table><p><a class="btn" href="quiz.html?topic=' + encodeURIComponent(m.topic_id) + '&level=practice">Adaptive practice</a> ' +
+      '<span class="muted small">A mix of questions matched to your current mastery. Does not affect level progress.</span></p>';
+    c.innerHTML = h;
+  } catch (err) { showError(c, err); }
+})();
+</script>
+</body></html>

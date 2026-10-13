@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quiz - Personalized Learning</title><link rel="stylesheet" href="style.css">
+<style>
+  .top-quiz-bar {
+    position: sticky; top: 0; background: #fff; z-index: 100;
+    border-bottom: 2px solid #3b82f6; padding: 10px 0; margin-bottom: 16px;
+    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;
+  }
+  .timer-badge {
+    font-size: 15px; font-weight: bold; background: #eff6ff; color: #1d4ed8;
+    padding: 6px 12px; border: 1px solid #bfdbfe; border-radius: 4px; display: inline-flex; align-items: center; gap: 6px;
+  }
+  .timer-badge.urgent {
+    background: #fef2f2; color: #b91c1c; border-color: #fecaca; animation: blink 1s infinite;
+  }
+  @keyframes blink { 50% { opacity: 0.6; } }
+  .q-nav {
+    display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; padding: 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;
+  }
+  .q-btn {
+    min-width: 32px; height: 32px; font-size: 13px; font-weight: bold; border: 1px solid #cbd5e1;
+    background: #fff; cursor: pointer; border-radius: 4px;
+  }
+  .q-btn.active { background: #2563eb; color: #fff; border-color: #1d4ed8; }
+  .q-btn.answered { background: #e0f2fe; border-color: #38bdf8; color: #0369a1; }
+  .paused-overlay {
+    padding: 40px 20px; text-align: center; background: #f8fafc; border: 2px dashed #94a3b8; border-radius: 8px; margin: 20px 0;
+  }
+  .congrats-modal {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7);
+    display: flex; align-items: center; justify-content: center; z-index: 1000;
+  }
+  .congrats-box {
+    background: #fff; max-width: 480px; width: 90%; padding: 24px; border-radius: 12px;
+    box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3); text-align: center;
+  }
+</style>
+</head>
+<body>
+<div id="top"></div>
+<div id="page">
+  <div id="content">Loading...</div>
+</div>
+<script src="app.js"></script>
+<script>
+(async function () {
+  var user = await requireLogin(); if (!user) return;
+  var topic = param("topic"), level = param("level") || "easy", c = document.getElementById("content");
+  if (!topic) { location.replace("subjects.html"); return; }
+  var mod, quiz, letters = ["A", "B", "C", "D"];
+  try {
+    mod = await api("/modules/" + encodeURIComponent(topic));
+    quiz = await api("/quiz/start", {topic_id: topic, difficulty: level});
+  } catch (err) {
+    showError(c, err);
+    c.innerHTML += '<p><a href="subjects.html">Back to subjects</a></p>';
+    return;
+  }
+  var title = mod.name + " - " + LEVEL_NAME[level] + (level === "practice" ? "" : " level");
+  document.title = title + " - Personalized Learning";
+  var crumbs = '<p class="crumbs"><a href="subjects.html">Subjects</a> &gt; <a href="modules.html?subject=' + encodeURIComponent(mod.subject) +
+    '">' + esc(mod.subject) + '</a> &gt; <a href="module.html?topic=' + encodeURIComponent(topic) + '">' + esc(mod.name) + '</a> &gt; ' + LEVEL_NAME[level] + '</p>';
+
+  if (!quiz.questions.length) {
+    c.innerHTML = crumbs + '<h1>' + esc(title) + '</h1><p>' + esc(quiz.note || "No questions yet.") + '</p>';
+    return;
+  }
+
+  var secondsLeft = quiz.seconds_left != null ? quiz.seconds_left : null;
+  var isPaused = !!quiz.is_paused;
+  var timerInterval = null;
+  var currentIdx = 0;
+  var picked = {}; // question_id -> chosen_index
+
+  function formatTime(secs) {
+    var m = Math.floor(secs / 60);
+    var s = secs % 60;
+    return m + ":" + (s < 10 ? "0" : "") + s;
+  }
+
+  function startTimer() {
+    if (timerInterval) clearInterval(timerInterval);
+    if (secondsLeft != null && !isPaused) {
+      timerInterval = setInterval(function () {
+        if (secondsLeft <= 1) {
+          secondsLeft = 0;
+          clearInterval(timerInterval);
+          updateTimerUI();
+          autoSubmitTimeout();
+        } else {
+          secondsLeft--;
+          updateTimerUI();
+        }
+      }, 1000);
+    }
+  }
+
+  function updateTimerUI() {
+    var el = document.getElementById("timer-display");
+    if (!el) return;
+    el.textContent = "⏱ " + formatTime(secondsLeft) + " remaining (2m / q)";
+    if (secondsLeft <= 120) el.className = "timer-badge urgent";
+    else el.className = "timer-badge";
+  }
+
+  async function togglePause() {
+    var pauseBtn = document.getElementById("pause-btn");
+    if (pauseBtn) pauseBtn.disabled = true;
+    try {
+      if (isPaused) {
+        var r = await api("/quiz/resume", {session_id: quiz.session_id});
+        isPaused = false;
+        if (r.seconds_left != null) secondsLeft = r.seconds_left;
+      } else {
+        var r = await api("/quiz/pause", {session_id: quiz.session_id});
+        isPaused = true;
+        if (r.seconds_left != null) secondsLeft = r.seconds_left;
+      }
+      draw();
+      startTimer();
+    } catch (e) {
+      alert("Error changing pause state: " + e.message);
+      if (pauseBtn) pauseBtn.disabled = false;
+    }
+  }
+
+  function draw() {
+    var h = crumbs;
+    h += '<div class="top-quiz-bar">';
+    h += '  <div><h1 style="margin:0">' + esc(title) + '</h1>';
+    h += '  <small class="muted">' + quiz.questions.length + ' questions' + (quiz.pass_mark ? ' · Need ' + quiz.pass_mark + ' to pass' : '') + '</small></div>';
+    h += '  <div style="display:flex; align-items:center; gap:8px;">';
+    if (secondsLeft != null) {
+      h += '    <span id="timer-display" class="timer-badge">⏱ ' + formatTime(secondsLeft) + ' remaining (2m / q)</span>';
+    }
+    if (level !== "practice") {
+      h += '    <button type="button" id="pause-btn" class="btn">' + (isPaused ? '▶ Resume' : '⏸ Pause') + '</button>';
+    }
+    h += '    <button type="button" id="quick-sub" class="btn" style="background:#2563eb; color:#fff; font-weight:bold;">Submit</button>';
+    h += '  </div>';
+    h += '</div>';
+
+    // Navigator
+    h += '<div class="q-nav"><strong>Questions:</strong> ';
+    quiz.questions.forEach(function (q, i) {
+      var isAns = picked[q.id] != null;
+      var isCur = i === currentIdx;
+      var cls = "q-btn" + (isCur ? " active" : "") + (!isCur && isAns ? " answered" : "");
+      h += '<button type="button" class="' + cls + '" data-idx="' + i + '">' + (i + 1) + '</button>';
+    });
+    h += '</div>';
+
+    if (isPaused) {
+      h += '<div class="paused-overlay">';
+      h += '  <h2>⏸ Test is Paused</h2>';
+      h += '  <p class="muted">The timer has stopped. Click Resume whenever you are ready.</p>';
+      h += '  <button type="button" id="overlay-resume" class="btn" style="padding:8px 24px; font-size:16px;">▶ Resume Quiz</button>';
+      h += '</div>';
+    } else {
+      var curQ = quiz.questions[currentIdx];
+      h += '<div class="box" style="margin-top:12px;">';
+      h += '  <p style="font-size:16px; font-weight:bold;">Question ' + (currentIdx + 1) + ' of ' + quiz.questions.length + ':</p>';
+      h += '  <p style="font-size:15px; margin: 10px 0;">' + esc(curQ.question) + '</p>';
+      h += '  <div style="margin: 14px 0;">';
+      curQ.options.forEach(function (o, j) {
+        var chk = picked[curQ.id] === j ? " checked" : "";
+        h += '  <label style="padding:8px; border:1px solid #e2e8f0; margin-bottom:6px; border-radius:4px; display:block; cursor:pointer;">';
+        h += '    <input type="radio" name="curOpt" value="' + j + '"' + chk + '> <b>' + letters[j] + '.</b> ' + esc(o);
+        h += '  </label>';
+      });
+      h += '  </div>';
+      h += '  <div style="display:flex; justify-content:space-between; margin-top:16px;">';
+      h += '    <button type="button" id="prev-btn" class="btn"' + (currentIdx === 0 ? ' disabled' : '') + '>&lt; Previous</button>';
+      if (currentIdx < quiz.questions.length - 1) {
+        h += '    <button type="button" id="next-btn" class="btn">Next &gt;</button>';
+      } else {
+        h += '    <button type="button" id="finish-btn" class="btn" style="background:#2563eb; color:#fff; font-weight:bold;">Finish & Submit</button>';
+      }
+      h += '  </div>';
+      h += '</div>';
+    }
+
+    h += '<div id="msg" style="margin-top:10px;"></div>';
+    c.innerHTML = h;
+
+    // Attach listeners
+    var pBtn = document.getElementById("pause-btn");
+    if (pBtn) pBtn.onclick = togglePause;
+    var oRes = document.getElementById("overlay-resume");
+    if (oRes) oRes.onclick = togglePause;
+    var qSub = document.getElementById("quick-sub");
+    if (qSub) qSub.onclick = doSubmit;
+
+    document.querySelectorAll(".q-btn").forEach(function (btn) {
+      btn.onclick = function () {
+        if (isPaused) return;
+        currentIdx = parseInt(this.getAttribute("data-idx"), 10);
+        draw();
+      };
+    });
+
+    var optRadios = document.querySelectorAll('input[name="curOpt"]');
+    optRadios.forEach(function (radio) {
+      radio.onchange = function () {
+        var curQ = quiz.questions[currentIdx];
+        picked[curQ.id] = parseInt(this.value, 10);
+        var navBtn = document.querySelector('.q-btn[data-idx="' + currentIdx + '"]');
+        if (navBtn) navBtn.className = "q-btn active answered";
+      };
+    });
+
+    var prevBtn = document.getElementById("prev-btn");
+    if (prevBtn) {
+      prevBtn.onclick = function () {
+        if (currentIdx > 0) { currentIdx--; draw(); }
+      };
+    }
+    var nextBtn = document.getElementById("next-btn");
+    if (nextBtn) {
+      nextBtn.onclick = function () {
+        if (currentIdx < quiz.questions.length - 1) { currentIdx++; draw(); }
+      };
+    }
+    var finBtn = document.getElementById("finish-btn");
+    if (finBtn) finBtn.onclick = doSubmit;
+  }
+
+  async function autoSubmitTimeout() {
+    alert("Time has run out! Submitting your answers now.");
+    await submitCore(true);
+  }
+
+  async function doSubmit() {
+    var answeredCount = Object.keys(picked).length;
+    var blank = quiz.questions.length - answeredCount;
+    if (blank > 0 && !confirm(blank + " question(s) not answered. Unanswered questions count as wrong. Submit anyway?")) {
+      return;
+    }
+    await submitCore(false);
+  }
+
+  async function submitCore(timedOut) {
+    if (timerInterval) clearInterval(timerInterval);
+    var answers = quiz.questions.map(function (q) {
+      return { question_id: q.id, chosen_index: picked[q.id] != null ? picked[q.id] : null };
+    });
+    try {
+      var r = await api("/quiz/submit", {
+        topic_id: topic,
+        difficulty: level,
+        session_id: quiz.session_id,
+        timed_out: timedOut,
+        answers: answers
+      });
+      result(r);
+    } catch (err) {
+      showError(document.getElementById("msg"), err);
+    }
+  }
+
+  function result(r) {
+    if (timerInterval) clearInterval(timerInterval);
+    var isPerfect = r.score === r.total && r.total > 0;
+    var h = crumbs;
+
+    // Congrats Popup
+    if (isPerfect) {
+      h += '<div id="congrats-modal" class="congrats-modal">';
+      h += '  <div class="congrats-box">';
+      h += '    <div style="font-size:50px; margin-bottom:10px;">🏆 🎉</div>';
+      h += '    <h2 style="margin:0 0 8px; color:#1e3a8a;">Congratulations!</h2>';
+      h += '    <p style="font-size:16px; font-weight:bold; color:#15803d; margin:0 0 12px;">PERFECT SCORE: ' + r.score + ' / ' + r.total + ' (100%)</p>';
+      h += '    <p class="muted">You answered every single question correctly! Outstanding work mastering this module level.</p>';
+      h += '    <button type="button" class="btn" style="background:#2563eb; color:#fff; font-size:15px; padding:8px 24px; margin-top:14px; border-radius:6px;" onclick="document.getElementById(\'congrats-modal\').style.display=\'none\';">Review Answers</button>';
+      h += '  </div>';
+      h += '</div>';
+    }
+
+    h += '<h1>' + esc(title) + ': result</h1>';
+    h += '<div class="box"><b>Score: ' + r.score + ' / ' + r.total + '</b> (' + Math.round(100 * r.score / r.total) + '%)<br>';
+    if (r.difficulty === "practice") h += 'Practice answers update your mastery estimate for this module.';
+    else if (r.passed) h += '<span class="ok">Passed! 🎉</span>' + (r.next_level ? ' The ' + LEVEL_NAME[r.next_level] + ' level is now unlocked.' : ' You have finished every level of this module.');
+    else h += '<span class="bad">Not passed.</span> You need ' + r.pass_mark + ' correct. Read the explanations below and try again.';
+    h += '</div><p>';
+    if (r.passed && r.next_level) h += '<a class="btn" href="quiz.html?topic=' + encodeURIComponent(topic) + '&level=' + r.next_level + '">Go to ' + LEVEL_NAME[r.next_level] + ' level</a> ';
+    h += '<a class="btn" href="quiz.html?topic=' + encodeURIComponent(topic) + '&level=' + level + '">' + (level === "practice" ? "Practice again" : "Retake this level") + '</a> ' +
+      '<a class="btn" href="modules.html?subject=' + encodeURIComponent(mod.subject) + '">Back to modules</a> ' +
+      '<a class="btn" href="dashboard.html">My progress</a></p><h2>Your answers</h2>';
+    r.results.forEach(function (x, i) {
+      var skipped = x.skipped, right = x.correct === true;
+      h += '<div class="q ' + (skipped ? "" : right ? "right" : "wrong") + '"><p>' + (i + 1) + '. ' + esc(x.question) + '</p>';
+      h += '<div>Your answer: ' + (skipped ? '<span class="bad">not answered</span>' :
+        '<span class="' + (right ? "ok" : "bad") + '">' + letters[x.chosen_index] + '. ' + esc(x.options[x.chosen_index]) + '</span>') + '</div>';
+      if (!right) h += '<div>Correct answer: <span class="ok">' + esc(x.correct_answer) + '</span></div>';
+      h += '<div class="muted" style="margin-top:6px; line-height:1.5;">' + esc(x.explanation) + '</div></div>';
+    });
+    c.innerHTML = h;
+    window.scrollTo(0, 0);
+  }
+
+  draw();
+  startTimer();
+})();
+</script>
+</body></html>

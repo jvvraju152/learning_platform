@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Create account - Personalized Learning</title><link rel="stylesheet" href="style.css"></head>
+<body>
+<div id="top"></div>
+<div id="page">
+  <h1>Create your account</h1>
+  <p id="hello"></p>
+  <form id="f">
+    <label for="email">Email</label>
+    <input type="email" id="email" maxlength="255" required autofocus>
+    <label for="pw">Password (at least 6 characters)</label>
+    <input type="password" id="pw" minlength="6" maxlength="200" required>
+    <label for="pw2">Type the password again</label>
+    <input type="password" id="pw2" required>
+    <p><button type="submit" id="go">Create account</button></p>
+  </form>
+  <div id="msg"></div>
+  <p class="muted">Already have an account? <a href="login.html">Log in</a></p>
+</div>
+<script src="app.js"></script>
+<script>
+(function () {
+  drawTop(null);
+  var name = "";
+  try { name = sessionStorage.getItem("name") || ""; } catch (x) {}
+  if (!name) { location.replace("index.html"); return; }
+  document.getElementById("hello").innerHTML = 'Hello, <b>' + esc(name) + '</b>. (<a href="index.html">not you?</a>)';
+  document.getElementById("f").onsubmit = async function (e) {
+    e.preventDefault();
+    var msg = document.getElementById("msg");
+    var pw = document.getElementById("pw").value;
+    if (pw !== document.getElementById("pw2").value) { showError(msg, "The two passwords do not match."); return; }
+    var btn = document.getElementById("go"); btn.disabled = true;
+    try {
+      await api("/register", {name: name, email: document.getElementById("email").value, password: pw});
+      location.href = "subjects.html";
+    } catch (err) { showError(msg, err); btn.disabled = false; }
+  };
+})();
+</script>
+</body></html>

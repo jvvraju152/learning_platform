@@ -1,0 +1,122 @@
+@import url("https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 20% 98%; --foreground: 224 71% 4%;
+    --card: 0 0% 100%; --card-foreground: 224 71% 4%;
+    --primary: 243 75% 59%; --primary-foreground: 0 0% 100%;
+    --secondary: 220 14% 96%; --secondary-foreground: 224 40% 12%;
+    --muted: 220 14% 96%; --muted-foreground: 220 9% 40%;
+    --accent: 243 90% 96%; --accent-foreground: 243 60% 40%;
+    --destructive: 0 72% 51%; --destructive-foreground: 0 0% 100%;
+    --success: 142 71% 30%;
+    --warning: 36 92% 44%;
+    --border: 220 13% 90%; --input: 220 13% 88%; --ring: 243 75% 59%; --radius: 0.75rem;
+
+    /* One soft, indigo-tinted shadow for raised surfaces (replaces the generic grey one). */
+    --shadow-card: 0 1px 2px hsl(243 40% 20% / 0.05), 0 8px 24px -12px hsl(243 40% 20% / 0.14);
+  }
+  * { @apply border-border; }
+  html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: Figtree, Inter, ui-sans-serif, system-ui, sans-serif;
+    min-height: 100dvh;
+  }
+  h1, h2, h3 { text-wrap: balance; letter-spacing: -0.015em; }
+  p { text-wrap: pretty; }
+  ::selection { background: hsl(var(--primary) / 0.18); }
+
+  /* Visible keyboard focus for plain links; shadcn controls keep their own ring. */
+  a:not([class*="focus-visible:"]):focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+    border-radius: 0.25rem;
+  }
+}
+
+@layer components {
+  /* ---- Tone system: any element with data-tone exposes --tone / --tone-soft / --tone-ink ---- */
+  [data-tone="weak"]       { --tone: var(--destructive); --tone-soft: 0 86% 96%;   --tone-ink: 0 66% 36%; }
+  [data-tone="developing"] { --tone: var(--warning);     --tone-soft: 45 100% 93%;  --tone-ink: 28 85% 27%; }
+  [data-tone="strong"]     { --tone: var(--success);     --tone-soft: 142 55% 93%;  --tone-ink: 142 72% 20%; }
+  [data-tone="neutral"]    { --tone: var(--primary);     --tone-soft: var(--accent); --tone-ink: var(--accent-foreground); }
+  [data-tone="muted"]      { --tone: 220 9% 58%;         --tone-soft: var(--muted);  --tone-ink: var(--muted-foreground); }
+
+  .card-raised { box-shadow: var(--shadow-card); }
+
+  .hero {
+    border-radius: calc(var(--radius) + 0.25rem);
+    background: hsl(var(--accent));
+    border: 1px solid hsl(var(--primary) / 0.14);
+  }
+
+  /* ---- Status pill: label + dot, so status never relies on colour alone ---- */
+  .pill {
+    display: inline-flex; align-items: center; gap: 0.375rem;
+    border-radius: 9999px; padding: 0.125rem 0.625rem;
+    font-size: 0.75rem; font-weight: 600; line-height: 1.25rem; white-space: nowrap;
+    background: hsl(var(--tone-soft)); color: hsl(var(--tone-ink));
+  }
+  .pill::before, .dot {
+    content: ""; display: inline-block; flex-shrink: 0;
+    width: 0.5rem; height: 0.5rem; border-radius: 9999px; background: hsl(var(--tone));
+  }
+  .dot { width: 0.625rem; height: 0.625rem; }
+
+  /* Small tinted square that holds an icon */
+  .tone-tile {
+    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+    width: 2.5rem; height: 2.5rem; border-radius: 0.75rem;
+    background: hsl(var(--tone-soft)); color: hsl(var(--tone-ink));
+  }
+  .tone-tile-sm { width: 1.75rem; height: 1.75rem; border-radius: 0.5rem; }
+
+  /* ---- Mastery bar ---- */
+  .mastery { height: 0.5rem; border-radius: 9999px; overflow: hidden; background: hsl(220 14% 92%); }
+  .mastery-lg { height: 0.625rem; }
+  .mastery-fill {
+    height: 100%; border-radius: inherit; background: hsl(var(--tone));
+    transition: width 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+
+  /* ---- Mastery ring (overall score) ---- */
+  .ring-track { stroke: hsl(var(--primary) / 0.15); }
+  .ring-arc {
+    stroke: hsl(var(--primary)); stroke-linecap: round;
+    transition: stroke-dashoffset 0.9s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+
+  /* ---- Segmented distribution bar ---- */
+  .seg-bar { display: flex; gap: 3px; height: 0.625rem; }
+  .seg { flex-basis: 0; min-width: 0.75rem; border-radius: 9999px; background: hsl(var(--tone)); }
+
+  /* ---- Feedback (success / warning / error). Reuse on quiz results, saves, plan creation. ---- */
+  .feedback {
+    display: flex; align-items: flex-start; gap: 0.625rem;
+    border-radius: calc(var(--radius) - 0.125rem); padding: 0.625rem 0.875rem;
+    font-size: 0.875rem; line-height: 1.4;
+    background: hsl(var(--tone-soft)); color: hsl(var(--tone-ink));
+    border: 1px solid hsl(var(--tone) / 0.28);
+  }
+  .feedback > svg { margin-top: 0.125rem; flex-shrink: 0; }
+  .feedback-pop { animation: feedback-in 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); }
+}
+
+@keyframes feedback-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
